@@ -2,6 +2,7 @@ import pygame
 
 class Alien:
     """Клас для створення прибульця"""
+
     def __init__(self, ai_game):
         """Ініціалізувати прибульця та задати його початкову позицію"""
         self.screen = ai_game.screen
