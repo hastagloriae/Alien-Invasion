@@ -4,7 +4,7 @@ import pygame
 
 from settings import Settings
 from ship import Ship
-from alien import Alien
+from bullet import Bullet
 
 class AlienInvasion:
     """Загальний клас, що керує ресурсами та поведінкою гри"""
@@ -20,7 +20,7 @@ class AlienInvasion:
         pygame.display.set_caption("Alien Invasion")
 
         self.ship = Ship(self)
-        self.alien = Alien(self)
+        self.bullets = pygame.sprite.Group()
 
         # Задати колір фону
         self.bg_color = (230, 230, 230)
@@ -30,6 +30,7 @@ class AlienInvasion:
         while True:
             self._check_events()
             self.ship.update()
+            self._update_bullets()
             self._update_screen()
 
     def _check_events(self):
@@ -51,6 +52,8 @@ class AlienInvasion:
             self.ship.moving_left = True
         elif event.key == pygame.K_q:
             sys.exit()
+        elif event.key == pygame.K_SPACE:
+            self._fire_bullet()
 
     def _check_keyup_events(self, event):
         """Реагування коли клавіша не натиснута"""
@@ -59,11 +62,28 @@ class AlienInvasion:
         elif event.key == pygame.K_LEFT:
             self.ship.moving_left = False
 
+    def _fire_bullet(self):
+        """Створити нову куль та додати її до групи куль"""
+        if len(self.bullets) < self.settings.bullets_allowed:
+            new_bullet = Bullet(self)
+            self.bullets.add(new_bullet)
+
+    def _update_bullets(self):
+        """Оновити позиції куль та позбавитися старих куль."""
+        # Оновити позиції куль.
+        self.bullets.update()
+
+        # Позбавитися куль, що зникли
+        for bullet in self.bullets.copy():
+            if bullet.rect.bottom <= 0:
+                self.bullets.remove(bullet)
+
     def _update_screen(self):
         """Оновити зображення на екрані та перемкнутися на новий екран"""
         self.screen.fill(self.settings.bg_color)
         self.ship.blitme()
-        self.alien.blitme()
+        for bullet in self.bullets.sprites():
+            bullet.draw_bullet()
 
         # Показати останній намальований екран
         pygame.display.flip()
