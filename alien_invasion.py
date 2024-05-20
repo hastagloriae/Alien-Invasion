@@ -1,10 +1,13 @@
 import sys
+from time import sleep
 
 import pygame
 
 from settings import Settings
+from game_stats import GameStats
 from ship import Ship
 from bullet import Bullet
+from alien import Alien
 
 class AlienInvasion:
     """Загальний клас, що керує ресурсами та поведінкою гри"""
@@ -19,8 +22,14 @@ class AlienInvasion:
         self.settings.screen_height = self.screen.get_rect().height
         pygame.display.set_caption("Alien Invasion")
 
+        # Створити екземпляр для збереження ігрової статистики
+        self.stats = GameStats(self)
+
         self.ship = Ship(self)
         self.bullets = pygame.sprite.Group()
+        self.aliens = pygame.sprite.Group()
+
+        self._create_fleet()
 
         # Задати колір фону
         self.bg_color = (230, 230, 230)
@@ -29,8 +38,11 @@ class AlienInvasion:
         """Розпочати головний цикл гри"""
         while True:
             self._check_events()
-            self.ship.update()
-            self._update_bullets()
+            if self.stats.game_active:
+                self.ship.update()
+                self._update_bullets()
+                self._update_aliens()
+
             self._update_screen()
 
     def _check_events(self):
@@ -78,12 +90,104 @@ class AlienInvasion:
             if bullet.rect.bottom <= 0:
                 self.bullets.remove(bullet)
 
+        self._check_bullet_alien_collisions()
+
+    def _check_bullet_alien_collisions(self):
+        """Реакція на зіткнення куль з прибульцями"""
+        # Видалити всі кулі та прибульців, що зіткнулися
+        collisions = pygame.sprite.groupcollide(self.bullets, self.aliens, True, True)
+
+        if not self.aliens:
+            # Знищити наявні кулі та створити новий флот
+            self.bullets.empty()
+            self._create_fleet()
+
+    def _update_aliens(self):
+        """Перевірити чи флот знаходиться на краю, тоді оновити позиції всіх прибульців флоту"""
+        self._check_fleet_edges()
+        self.aliens.update()
+
+        # Шукати зіткнення куль із прибульцями.
+        if pygame.sprite.spritecollideany(self.ship, self.aliens):
+            self._ship_hit()
+
+        # Шукати чи котрий із прибульців досяг нижнього краю
+        self._check_aliens_bottom()
+
+    def _ship_hit(self):
+        """Реагувати на зіткнення прибульця з кораблем"""
+        if self.stats.ships_left > 0:
+            #Зменшити ships_left.
+            self.stats.ships_left -= 1
+            # Позбвіитися надлишку прибульця і куль
+            self.aliens.empty()
+            self.bullets.empty()
+            # Створити новий флот на відобьразити корабль
+            self._create_fleet()
+            self.ship.center_ship()
+            # пауза
+            sleep(0.5)
+        else:
+            self.stats.game_active = False
+
+    def _create_fleet(self):
+        """Створити флот прибульців"""
+        # Створити флот прибульця та кількість прибульців у рядку.
+        # Відстань між прибульцями дорівнює одній ширині одного прибульця.
+        alien = Alien(self)
+        alien_width, alien_height = alien.rect.size
+        available_space_x = self.settings.screen_width - (2 * alien_width)
+        number_aliens_x = available_space_x // (2 * alien_width)
+
+        # Визначити яка кількість рядів прибульців поміщається на єкрані.
+        ship_height = self.ship.rect.height
+        available_space_y = (self.settings.screen_height - (3 * alien_height) - ship_height)
+        number_rows = available_space_y // (2 * alien_height)
+
+        # Створити повний флот прибульців
+        for row_number in range(number_rows):
+            for alien_number in range(number_aliens_x):
+                self._create_alien(alien_number, row_number)
+
+    def _create_alien(self, alien_number, row_number):
+        # Створити прибульця та поставити його до ряду.
+        alien = Alien(self)
+        alien_width, alien_height = alien.rect.size
+        alien_width = alien.rect.width
+        alien.x = alien_width + 2 * alien_width * alien_number
+        alien.rect.x = alien.x
+        alien.rect.y = alien.rect.height + 2 * alien.rect.height * row_number
+        self.aliens.add(alien)
+
+    def _check_fleet_edges(self):
+        """Реагує відповідно до того, чи досяг котрийсь із прибульців краю екрана."""
+        for alien in self.aliens.sprites():
+            if alien.check_edges():
+                self._change_fleet_direction()
+                break
+
+    def _check_aliens_bottom(self):
+        """перевірити чи не доясг якийсь прибулець нижнього краю екрана"""
+        screen_rect = self.screen.get_rect()
+        for alien in self.aliens.sprites():
+            if alien.rect.bottom >= screen_rect.bottom:
+                # Зберегти так нібт корабель було підбито
+                self._ship_hit()
+                break
+
+    def _change_fleet_direction(self):
+        """Спуск всього флоту та зміна його напрямку"""
+        for alien in self.aliens.sprites():
+            alien.rect.y += self.settings.fleet_drop_speed
+        self.settings.fleet_direction *= -1
+
     def _update_screen(self):
         """Оновити зображення на екрані та перемкнутися на новий екран"""
         self.screen.fill(self.settings.bg_color)
         self.ship.blitme()
         for bullet in self.bullets.sprites():
             bullet.draw_bullet()
+        self.aliens.draw(self.screen)
 
         # Показати останній намальований екран
         pygame.display.flip()
