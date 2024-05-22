@@ -7,9 +7,14 @@ class GameStats:
         self.reset_stats()
 
         # Розпочати гру в активному стані
-        self.game_active = True
+        self.game_active = False
+
 
     def reset_stats(self):
         """Ініціалізувати статистики, зо сможе змінювати впровдовж гри"""
         self.ships_left = self.settings.ship_limit
+        self.score = 0
+        self.level = 1
 
+        # Рекорд не анолювується
+        self.high_score = 0
